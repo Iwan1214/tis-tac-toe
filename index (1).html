@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tic Tac Toe</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem;
+      background-color: #f5f5f5;
+      background-image: var(--bg-image, none);
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      transition: background-image 0.3s;
+    }
+    .wrap { width: 100%; max-width: 480px; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Glass effect for cards when bg image is set */
+    .glass {
+      background: rgba(255,255,255,0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    body.has-bg .auth-card,
+    body.has-bg .game-card,
+    body.has-bg .stats-card,
+    body.has-bg .topbar,
+    body.has-bg .tabs { background: rgba(255,255,255,0.82) !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+    .auth-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 2rem; }
+    .auth-card h1 { font-size: 22px; font-weight: 600; margin-bottom: 1.5rem; text-align: center; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; color: #666; margin-bottom: 5px; }
+    .field input[type="text"], .field input[type="password"] { width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; outline: none; transition: border-color 0.15s; background: #fff; }
+    .field input:focus { border-color: #7F77DD; }
+    .err { color: #c0392b; font-size: 13px; margin-top: 6px; min-height: 18px; }
+    .btn-primary { width: 100%; padding: 11px; background: #7F77DD; border: none; border-radius: 8px; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 6px; transition: background 0.15s; }
+    .btn-primary:hover { background: #534AB7; }
+    .link-btn { background: none; border: none; color: #534AB7; font-size: 13px; cursor: pointer; text-decoration: underline; margin-top: 12px; display: block; text-align: center; }
+
+    .topbar { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 10px 16px; margin-bottom: 1rem; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: #EEEDFE; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #534AB7; flex-shrink: 0; }
+    .topbar-right { display: flex; align-items: center; gap: 8px; }
+    .icon-btn { font-size: 13px; color: #888; background: none; border: 1px solid #ddd; border-radius: 8px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+    .icon-btn:hover { background: #f5f5f5; color: #333; }
+    .icon-btn.danger:hover { background: #fff0f0; color: #c0392b; border-color: #f5c6c6; }
+
+    .tabs { display: flex; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+    .tab { flex: 1; padding: 10px; font-size: 14px; background: none; border: none; cursor: pointer; color: #888; font-weight: 500; }
+    .tab.active { background: #7F77DD; color: #fff; }
+
+    .game-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 1.5rem; }
+    .mode-row, .diff-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 1rem; }
+    .mode-btn { padding: 7px 18px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; color: #888; font-size: 13px; cursor: pointer; font-weight: 500; }
+    .mode-btn.active { background: #7F77DD; border-color: #7F77DD; color: #fff; }
+    .diff-btn { padding: 6px 14px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; color: #888; font-size: 13px; cursor: pointer; }
+    .diff-btn.active { background: #E1F5EE; border-color: #1D9E75; color: #0F6E56; font-weight: 500; }
+
+    .score-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 1rem; }
+    .sc { background: #f8f8f8; border-radius: 8px; padding: 10px 20px; text-align: center; }
+    .sc-lbl { font-size: 11px; color: #888; margin-bottom: 2px; }
+    .sc-num { font-size: 22px; font-weight: 600; }
+    .status { font-size: 17px; font-weight: 600; text-align: center; margin-bottom: 1rem; min-height: 26px; color: #333; }
+    .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 auto 1.2rem; }
+    .cell { aspect-ratio: 1; border-radius: 12px; border: 1.5px solid #e0e0e0; background: rgba(248,248,248,0.9); font-size: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: background 0.1s, border-color 0.1s; }
+    .cell:hover:not(.taken) { background: #EEEDFE; border-color: #7F77DD; }
+    .cell.taken { cursor: default; }
+    .cell.x-mark { color: #534AB7; }
+    .cell.o-mark { color: #0F6E56; }
+    .cell.win-cell { background: #EEEDFE; border-color: #7F77DD; }
+    .reset-btn { display: block; margin: 0 auto; padding: 9px 28px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; color: #333; font-size: 14px; cursor: pointer; font-weight: 500; }
+    .reset-btn:hover { background: #f5f5f5; }
+
+    /* BG settings panel */
+    .bg-panel { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; }
+    .bg-panel-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 1rem; }
+    .bg-preview { width: 100%; height: 120px; border-radius: 10px; border: 2px dashed #ddd; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; background-size: cover; background-position: center; position: relative; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+    .bg-preview:hover { border-color: #7F77DD; }
+    .bg-preview-label { font-size: 13px; color: #aaa; pointer-events: none; }
+    .bg-preview.has-img .bg-preview-label { display: none; }
+    .bg-actions { display: flex; gap: 8px; }
+    .bg-upload-btn { flex: 1; padding: 9px; background: #7F77DD; border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .bg-upload-btn:hover { background: #534AB7; }
+    .bg-remove-btn { padding: 9px 16px; background: #fff; border: 1px solid #ddd; border-radius: 8px; color: #888; font-size: 13px; cursor: pointer; }
+    .bg-remove-btn:hover { background: #fff0f0; color: #c0392b; border-color: #f5c6c6; }
+    .color-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .color-preset { width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s, transform 0.1s; }
+    .color-preset:hover { transform: scale(1.1); }
+    .color-preset.active { border-color: #7F77DD; }
+    .preset-label { font-size: 12px; color: #aaa; margin-top: 10px; margin-bottom: 6px; }
+
+    /* Stats */
+    .stats-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 1.5rem; }
+    .stats-name { font-size: 17px; font-weight: 600; margin-bottom: 1.2rem; color: #333; }
+    .mode-section { margin-bottom: 1.8rem; }
+    .mode-section:last-child { margin-bottom: 0; }
+    .mode-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+    .mode-tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px; }
+    .tag-2p { background: #EEEDFE; color: #534AB7; }
+    .tag-easy { background: #E1F5EE; color: #0F6E56; }
+    .tag-hard { background: #FCEBEB; color: #A32D2D; }
+    .mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+    .mini-stat { background: #f8f8f8; border-radius: 8px; padding: 8px; text-align: center; }
+    .mini-stat-lbl { font-size: 10px; color: #aaa; margin-bottom: 2px; }
+    .mini-stat-val { font-size: 20px; font-weight: 700; }
+    .hist-title { font-size: 12px; color: #aaa; margin-bottom: 6px; }
+    .hist-item { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #f5f5f5; font-size: 12px; color: #666; }
+    .hist-item:last-child { border-bottom: none; }
+    .badge { font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 600; }
+    .badge-win { background: #E1F5EE; color: #0F6E56; }
+    .badge-lose { background: #FCEBEB; color: #A32D2D; }
+    .badge-draw { background: #f0f0f0; color: #666; }
+    .no-hist { font-size: 12px; color: #ccc; padding: 6px 0; }
+
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Auth -->
+  <div id="page-auth" class="page active">
+    <div id="auth-login">
+      <div class="auth-card">
+        <h1>Log masuk</h1>
+        <div class="field"><label>Nama pengguna</label><input type="text" id="li-user" placeholder="nama pengguna" /></div>
+        <div class="field"><label>Kata laluan</label><input type="password" id="li-pass" placeholder="kata laluan" /></div>
+        <div class="err" id="li-err"></div>
+        <button class="btn-primary" onclick="doLogin()">Log masuk</button>
+        <button class="link-btn" onclick="showReg()">Belum ada akaun? Daftar di sini</button>
+      </div>
+    </div>
+    <div id="auth-reg" style="display:none">
+      <div class="auth-card">
+        <h1>Daftar akaun</h1>
+        <div class="field"><label>Nama pengguna</label><input type="text" id="reg-user" placeholder="nama pengguna" /></div>
+        <div class="field"><label>Kata laluan</label><input type="password" id="reg-pass" placeholder="kata laluan" /></div>
+        <div class="field"><label>Sahkan kata laluan</label><input type="password" id="reg-pass2" placeholder="ulang kata laluan" /></div>
+        <div class="err" id="reg-err"></div>
+        <button class="btn-primary" onclick="doReg()">Daftar</button>
+        <button class="link-btn" onclick="showLogin()">Sudah ada akaun? Log masuk</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game -->
+  <div id="page-game" class="page">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="avatar" id="top-avatar"></div>
+        <span style="font-size:14px;font-weight:600" id="top-name"></span>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" onclick="showTab('bg')">&#127912; Latar</button>
+        <button class="icon-btn danger" onclick="doLogout()">Log keluar</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" id="tab-game" onclick="showTab('game')">Permainan</button>
+      <button class="tab" id="tab-stats" onclick="showTab('stats')">Rekod saya</button>
+      <button class="tab" id="tab-bg" onclick="showTab('bg')" style="display:none"></button>
+    </div>
+
+    <!-- Game section -->
+    <div id="section-game">
+      <div class="game-card">
+        <div class="mode-row">
+          <button class="mode-btn active" id="btn2p" onclick="setMode('2p')">2 Pemain</button>
+          <button class="mode-btn" id="btnai" onclick="setMode('ai')">Lawan AI</button>
+        </div>
+        <div id="diff-row" class="diff-row" style="display:none">
+          <button class="diff-btn active" id="d-easy" onclick="setDiff('easy')">Mudah</button>
+          <button class="diff-btn" id="d-hard" onclick="setDiff('hard')">Susah</button>
+        </div>
+        <div class="score-row">
+          <div class="sc"><div class="sc-lbl" id="lbl-x">Pemain X</div><div class="sc-num" id="score-x">0</div></div>
+          <div class="sc"><div class="sc-lbl">Seri</div><div class="sc-num" id="score-d">0</div></div>
+          <div class="sc"><div class="sc-lbl" id="lbl-o">Pemain O</div><div class="sc-num" id="score-o">0</div></div>
+        </div>
+        <div class="status" id="status">Giliran X</div>
+        <div class="board" id="board"></div>
+        <button class="reset-btn" onclick="resetGame()">Main semula</button>
+      </div>
+    </div>
+
+    <!-- Stats section -->
+    <div id="section-stats" style="display:none">
+      <div class="stats-card">
+        <div class="stats-name" id="stats-title">Rekod saya</div>
+        <div class="mode-section">
+          <div class="mode-header"><span class="mode-tag tag-2p">2 Pemain</span></div>
+          <div class="mini-stats">
+            <div class="mini-stat"><div class="mini-stat-lbl">Menang</div><div class="mini-stat-val" id="s2-win" style="color:#0F6E56">0</div></div>
+            <div class="mini-stat"><div class="mini-stat-lbl">Kalah</div><div class="mini-stat-val" id="s2-lose" style="color:#A32D2D">0</div></div>
+            <div class="mini-stat"><div class="mini-stat-lbl">Seri</div><div class="mini-stat-val" id="s2-draw" style="color:#888">0</div></div>
+          </div>
+          <div class="hist-title">Sejarah terkini</div>
+          <div id="hist-2p"></div>
+        </div>
+        <div class="mode-section">
+          <div class="mode-header"><span class="mode-tag tag-easy">AI Mudah</span></div>
+          <div class="mini-stats">
+            <div class="mini-stat"><div class="mini-stat-lbl">Menang</div><div class="mini-stat-val" id="se-win" style="color:#0F6E56">0</div></div>
+            <div class="mini-stat"><div class="mini-stat-lbl">Kalah</div><div class="mini-stat-val" id="se-lose" style="color:#A32D2D">0</div></div>
+            <div class="mini-stat"><div class="mini-stat-lbl">Seri</div><div class="mini-stat-val" id="se-draw" style="color:#888">0</div></div>
+          </div>
+          <div class="hist-title">Sejarah terkini</div>
+          <div id="hist-easy"></div>
+        </div>
+        <div class="mode-section">
+          <div class="mode-header"><span class="mode-tag tag-hard">AI Susah</span></div>
+          <div class="mini-stats">
+            <div class="mini-stat"><div class="mini-stat-lbl">Menang</div><div class="mini-stat-val" id="sh-win" style="color:#0F6E56">0</div></div>
+            <div class="mini-stat"><div class="mini-stat-lbl">Kalah</div><div class="mini-stat-val" id="sh-lose" style="color:#A32D2D">0</div></div>
+            <div class="mini-stat"><div class="mini-stat-lbl">Seri</div><div class="mini-stat-val" id="sh-draw" style="color:#888">0</div></div>
+          </div>
+          <div class="hist-title">Sejarah terkini</div>
+          <div id="hist-hard"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BG section -->
+    <div id="section-bg" style="display:none">
+      <div class="bg-panel">
+        <div class="bg-panel-title">&#127912; Tukar latar belakang</div>
+        <div class="bg-preview" id="bg-preview" onclick="document.getElementById('bg-file').click()">
+          <span class="bg-preview-label">Klik untuk pilih gambar</span>
+        </div>
+        <input type="file" id="bg-file" accept="image/*" onchange="handleBgUpload(event)" />
+        <div class="bg-actions">
+          <button class="bg-upload-btn" onclick="document.getElementById('bg-file').click()">Upload gambar</button>
+          <button class="bg-remove-btn" onclick="removeBg()">Buang latar</button>
+        </div>
+        <div class="preset-label">Atau pilih warna latar:</div>
+        <div class="color-presets" id="color-presets"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORE_KEY = 'ttt_accounts_v2';
+const BG_KEY = 'ttt_bg_v1';
+
+function loadStore() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e) { return {}; } }
+function saveStore(s) { try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch(e) {} }
+let store = loadStore();
+let currentUser = null;
+
+function getUser(u) { return store[u] || null; }
+function saveUser(u, data) { store[u] = data; saveStore(store); }
+function initUser(password) {
+  return { password, modes: {
+    '2p':   { wins:0, losses:0, draws:0, history:[] },
+    'easy': { wins:0, losses:0, draws:0, history:[] },
+    'hard': { wins:0, losses:0, draws:0, history:[] }
+  }};
+}
+
+function showReg() { document.getElementById('auth-login').style.display='none'; document.getElementById('auth-reg').style.display='block'; }
+function showLogin() { document.getElementById('auth-reg').style.display='none'; document.getElementById('auth-login').style.display='block'; }
+
+function doReg() {
+  const u=document.getElementById('reg-user').value.trim();
+  const p=document.getElementById('reg-pass').value;
+  const p2=document.getElementById('reg-pass2').value;
+  const err=document.getElementById('reg-err');
+  if(!u){err.textContent='Sila masukkan nama pengguna.';return;}
+  if(p.length<4){err.textContent='Kata laluan sekurang-kurangnya 4 aksara.';return;}
+  if(p!==p2){err.textContent='Kata laluan tidak sepadan.';return;}
+  if(getUser(u)){err.textContent='Nama pengguna sudah digunakan.';return;}
+  saveUser(u, initUser(p));
+  err.textContent=''; loginAs(u);
+}
+
+function doLogin() {
+  const u=document.getElementById('li-user').value.trim();
+  const p=document.getElementById('li-pass').value;
+  const err=document.getElementById('li-err');
+  const ud=getUser(u);
+  if(!ud||ud.password!==p){err.textContent='Nama pengguna atau kata laluan salah.';return;}
+  err.textContent=''; loginAs(u);
+}
+
+function loginAs(u) {
+  currentUser=u;
+  document.getElementById('page-auth').className='page';
+  document.getElementById('page-game').className='page active';
+  document.getElementById('top-avatar').textContent=u.slice(0,2).toUpperCase();
+  document.getElementById('top-name').textContent=u;
+  scores={X:0,O:0,D:0};
+  ['x','o','d'].forEach(k=>document.getElementById('score-'+k).textContent='0');
+  loadBg();
+  resetGame(); showTab('game');
+}
+
+function doLogout() {
+  currentUser=null;
+  document.getElementById('page-game').className='page';
+  document.getElementById('page-auth').className='page active';
+  showLogin();
+}
+
+function showTab(t) {
+  ['game','stats','bg'].forEach(s=>{
+    document.getElementById('section-'+s).style.display=s===t?'block':'none';
+    const tb=document.getElementById('tab-'+s);
+    if(tb) tb.className='tab'+(s===t?' active':'');
+  });
+  if(t==='stats') renderStats();
+  if(t==='bg') renderBgPreview();
+}
+
+/* ---- Background ---- */
+const COLOR_PRESETS = [
+  {color:'#f5f5f5', label:'Putih'},
+  {color:'#1a1a2e', label:'Malam'},
+  {color:'#0f3460', label:'Laut'},
+  {color:'#16213e', label:'Gelap'},
+  {color:'#2d6a4f', label:'Hutan'},
+  {color:'#6d4c41', label:'Coklat'},
+  {color:'#4a0e8f', label:'Ungu'},
+  {color:'#b5179e', label:'Pink'},
+  {color:'#e63946', label:'Merah'},
+  {color:'#f4a261', label:'Oren'},
+];
+
+function buildColorPresets() {
+  const container=document.getElementById('color-presets');
+  container.innerHTML=COLOR_PRESETS.map((p,i)=>
+    `<div class="color-preset" style="background:${p.color}" title="${p.label}" onclick="setBgColor('${p.color}',${i})" id="preset-${i}"></div>`
+  ).join('');
+}
+
+function setBgColor(color, idx) {
+  document.body.style.backgroundImage='none';
+  document.body.style.backgroundColor=color;
+  document.body.classList.remove('has-bg');
+  document.getElementById('bg-preview').style.backgroundImage='none';
+  document.getElementById('bg-preview').classList.remove('has-img');
+  document.querySelectorAll('.color-preset').forEach(e=>e.classList.remove('active'));
+  const el=document.getElementById('preset-'+idx);
+  if(el) el.classList.add('active');
+  try { localStorage.setItem(BG_KEY, JSON.stringify({type:'color', value:color, idx})); } catch(e){}
+}
+
+function handleBgUpload(event) {
+  const file=event.target.files[0]; if(!file) return;
+  if(file.size > 5*1024*1024) { alert('Gambar terlalu besar. Sila pilih gambar di bawah 5MB.'); return; }
+  const reader=new FileReader();
+  reader.onload=function(e) {
+    const dataUrl=e.target.result;
+    applyBgImage(dataUrl);
+    try { localStorage.setItem(BG_KEY, JSON.stringify({type:'image', value:dataUrl})); } catch(err) {
+      alert('Gambar terlalu besar untuk disimpan. Cuba gambar yang lebih kecil.');
+    }
+  };
+  reader.readAsDataURL(file);
+  event.target.value='';
+}
+
+function applyBgImage(dataUrl) {
+  document.body.style.backgroundImage=`url(${dataUrl})`;
+  document.body.style.backgroundColor='#000';
+  document.body.classList.add('has-bg');
+  document.querySelectorAll('.color-preset').forEach(e=>e.classList.remove('active'));
+  renderBgPreview(dataUrl);
+}
+
+function renderBgPreview(dataUrl) {
+  const preview=document.getElementById('bg-preview');
+  if(!dataUrl) {
+    try {
+      const saved=JSON.parse(localStorage.getItem(BG_KEY)||'{}');
+      if(saved.type==='image') dataUrl=saved.value;
+    } catch(e){}
+  }
+  if(dataUrl) {
+    preview.style.backgroundImage=`url(${dataUrl})`;
+    preview.classList.add('has-img');
+  } else {
+    preview.style.backgroundImage='none';
+    preview.classList.remove('has-img');
+  }
+}
+
+function removeBg() {
+  document.body.style.backgroundImage='none';
+  document.body.style.backgroundColor='#f5f5f5';
+  document.body.classList.remove('has-bg');
+  document.getElementById('bg-preview').style.backgroundImage='none';
+  document.getElementById('bg-preview').classList.remove('has-img');
+  document.querySelectorAll('.color-preset').forEach(e=>e.classList.remove('active'));
+  try { localStorage.removeItem(BG_KEY); } catch(e){}
+}
+
+function loadBg() {
+  try {
+    const saved=JSON.parse(localStorage.getItem(BG_KEY)||'{}');
+    if(saved.type==='image') { applyBgImage(saved.value); }
+    else if(saved.type==='color') { setBgColor(saved.value, saved.idx); }
+  } catch(e){}
+}
+
+/* ---- Stats ---- */
+function renderHistBlock(containerId, history) {
+  const el=document.getElementById(containerId);
+  if(!history.length){el.innerHTML='<div class="no-hist">Belum ada rekod.</div>';return;}
+  el.innerHTML=history.slice().reverse().slice(0,8).map(h=>{
+    const badge=h.result==='win'?'<span class="badge badge-win">Menang</span>':h.result==='lose'?'<span class="badge badge-lose">Kalah</span>':'<span class="badge badge-draw">Seri</span>';
+    return `<div class="hist-item"><span>${h.date}</span>${badge}</div>`;
+  }).join('');
+}
+
+function renderStats() {
+  const ud=getUser(currentUser); if(!ud) return;
+  document.getElementById('stats-title').textContent='Rekod '+currentUser;
+  const m=ud.modes;
+  document.getElementById('s2-win').textContent=m['2p'].wins;
+  document.getElementById('s2-lose').textContent=m['2p'].losses;
+  document.getElementById('s2-draw').textContent=m['2p'].draws;
+  document.getElementById('se-win').textContent=m['easy'].wins;
+  document.getElementById('se-lose').textContent=m['easy'].losses;
+  document.getElementById('se-draw').textContent=m['easy'].draws;
+  document.getElementById('sh-win').textContent=m['hard'].wins;
+  document.getElementById('sh-lose').textContent=m['hard'].losses;
+  document.getElementById('sh-draw').textContent=m['hard'].draws;
+  renderHistBlock('hist-2p', m['2p'].history);
+  renderHistBlock('hist-easy', m['easy'].history);
+  renderHistBlock('hist-hard', m['hard'].history);
+}
+
+function getModeKey() { return mode==='2p'?'2p':diff==='easy'?'easy':'hard'; }
+
+function recordResult(result) {
+  if(!currentUser) return;
+  const ud=getUser(currentUser); if(!ud) return;
+  const key=getModeKey();
+  if(result==='win') ud.modes[key].wins++;
+  else if(result==='lose') ud.modes[key].losses++;
+  else ud.modes[key].draws++;
+  ud.modes[key].history.push({result, date:new Date().toLocaleDateString('ms-MY')});
+  saveUser(currentUser, ud);
+}
+
+/* ---- Game ---- */
+let mode='2p', diff='easy';
+let board=Array(9).fill(''), current='X', gameOver=false;
+let scores={X:0,O:0,D:0};
+const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+function setMode(m) {
+  mode=m;
+  document.getElementById('btn2p').className='mode-btn'+(m==='2p'?' active':'');
+  document.getElementById('btnai').className='mode-btn'+(m==='ai'?' active':'');
+  document.getElementById('diff-row').style.display=m==='ai'?'flex':'none';
+  document.getElementById('lbl-o').textContent=m==='ai'?'AI':'Pemain O';
+  resetGame();
+}
+function setDiff(d) {
+  diff=d;
+  document.getElementById('d-easy').className='diff-btn'+(d==='easy'?' active':'');
+  document.getElementById('d-hard').className='diff-btn'+(d==='hard'?' active':'');
+  resetGame();
+}
+function checkWinner(b) {
+  for(let [a,bx,c] of wins) if(b[a]&&b[a]===b[bx]&&b[a]===b[c]) return {winner:b[a],line:[a,bx,c]};
+  if(b.every(x=>x)) return {winner:'D'};
+  return null;
+}
+function minimax(b,isMax,depth) {
+  const r=checkWinner(b);
+  if(r){if(r.winner==='O')return 10-depth;if(r.winner==='X')return depth-10;return 0;}
+  if(isMax){let best=-Infinity;for(let i=0;i<9;i++)if(!b[i]){b[i]='O';best=Math.max(best,minimax(b,false,depth+1));b[i]='';}return best;}
+  let best=Infinity;for(let i=0;i<9;i++)if(!b[i]){b[i]='X';best=Math.min(best,minimax(b,true,depth+1));b[i]='';}return best;
+}
+function aiMove() {
+  const empty=board.map((v,i)=>v?null:i).filter(i=>i!==null); if(!empty.length) return;
+  let idx;
+  if(diff==='easy'){idx=empty[Math.floor(Math.random()*empty.length)];}
+  else{let best=-Infinity,bestIdx=empty[0];for(let i of empty){board[i]='O';let s=minimax(board,false,0);board[i]='';if(s>best){best=s;bestIdx=i;}}idx=bestIdx;}
+  board[idx]='O'; renderBoard();
+  const r=checkWinner(board); if(r){endGame(r);return;}
+  current='X'; document.getElementById('status').textContent='Giliran X';
+}
+function cellClick(i) {
+  if(gameOver||board[i]) return;
+  if(mode==='ai'&&current==='O') return;
+  board[i]=current; renderBoard();
+  const r=checkWinner(board); if(r){endGame(r);return;}
+  if(mode==='2p'){current=current==='X'?'O':'X';document.getElementById('status').textContent='Giliran '+current;}
+  else{current='O';document.getElementById('status').textContent='AI sedang berfikir...';setTimeout(aiMove,400);}
+}
+function endGame(r) {
+  gameOver=true;
+  const cells=document.querySelectorAll('.cell');
+  if(r.winner==='D'){
+    document.getElementById('status').textContent='Seri!';
+    scores.D++;document.getElementById('score-d').textContent=scores.D;
+    recordResult('draw');
+  } else {
+    if(r.line) r.line.forEach(i=>cells[i].classList.add('win-cell'));
+    if(mode==='ai'){
+      document.getElementById('status').textContent=r.winner==='O'?'AI menang!':'Anda menang!';
+      recordResult(r.winner==='X'?'win':'lose');
+    } else {
+      document.getElementById('status').textContent='Pemain '+r.winner+' menang!';
+      recordResult('win');
+    }
+    scores[r.winner]++;
+    document.getElementById('score-'+r.winner.toLowerCase()).textContent=scores[r.winner];
+  }
+}
+function renderBoard() {
+  document.querySelectorAll('.cell').forEach((c,i)=>{
+    c.textContent=board[i]==='X'?'✕':board[i]==='O'?'○':'';
+    c.className='cell'+(board[i]?' taken':'')+(board[i]==='X'?' x-mark':board[i]==='O'?' o-mark':'');
+  });
+}
+function resetGame() {
+  board=Array(9).fill('');current='X';gameOver=false;
+  document.getElementById('status').textContent='Giliran X';
+  document.querySelectorAll('.cell').forEach(c=>c.className='cell');
+  renderBoard();
+}
+function buildBoard() {
+  const b=document.getElementById('board');b.innerHTML='';
+  for(let i=0;i<9;i++){const c=document.createElement('div');c.className='cell';c.onclick=()=>cellClick(i);b.appendChild(c);}
+}
+
+buildBoard();
+buildColorPresets();
+loadBg();
+</script>
+</body>
+</html>
