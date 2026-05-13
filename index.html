@@ -24,12 +24,6 @@
     .page { display: none; }
     .page.active { display: block; }
 
-    /* Glass effect for cards when bg image is set */
-    .glass {
-      background: rgba(255,255,255,0.82);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-    }
     body.has-bg .auth-card,
     body.has-bg .game-card,
     body.has-bg .stats-card,
@@ -80,7 +74,6 @@
     .reset-btn { display: block; margin: 0 auto; padding: 9px 28px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; color: #333; font-size: 14px; cursor: pointer; font-weight: 500; }
     .reset-btn:hover { background: #f5f5f5; }
 
-    /* BG settings panel */
     .bg-panel { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; }
     .bg-panel-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 1rem; }
     .bg-preview { width: 100%; height: 120px; border-radius: 10px; border: 2px dashed #ddd; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; background-size: cover; background-position: center; position: relative; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
@@ -98,7 +91,6 @@
     .color-preset.active { border-color: #7F77DD; }
     .preset-label { font-size: 12px; color: #aaa; margin-top: 10px; margin-bottom: 6px; }
 
-    /* Stats */
     .stats-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 1.5rem; }
     .stats-name { font-size: 17px; font-weight: 600; margin-bottom: 1.2rem; color: #333; }
     .mode-section { margin-bottom: 1.8rem; }
@@ -251,12 +243,14 @@
 
 <script>
 const STORE_KEY = 'ttt_accounts_v2';
-const BG_KEY = 'ttt_bg_v1';
 
 function loadStore() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e) { return {}; } }
 function saveStore(s) { try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch(e) {} }
 let store = loadStore();
 let currentUser = null;
+
+// ---- Background key is now per-user ----
+function bgKey(u) { return 'ttt_bg_' + u; }
 
 function getUser(u) { return store[u] || null; }
 function saveUser(u, data) { store[u] = data; saveStore(store); }
@@ -301,15 +295,28 @@ function loginAs(u) {
   document.getElementById('top-name').textContent=u;
   scores={X:0,O:0,D:0};
   ['x','o','d'].forEach(k=>document.getElementById('score-'+k).textContent='0');
-  loadBg();
+  // Load BG for this specific user
+  loadBg(u);
   resetGame(); showTab('game');
 }
 
 function doLogout() {
   currentUser=null;
+  // Reset background to default before going back to auth screen
+  applyDefaultBg();
   document.getElementById('page-game').className='page';
   document.getElementById('page-auth').className='page active';
   showLogin();
+}
+
+// Apply a clean default background (no user-specific settings)
+function applyDefaultBg() {
+  document.body.style.backgroundImage='none';
+  document.body.style.backgroundColor='#f5f5f5';
+  document.body.classList.remove('has-bg');
+  document.querySelectorAll('.color-preset').forEach(e=>e.classList.remove('active'));
+  const preview=document.getElementById('bg-preview');
+  if(preview){ preview.style.backgroundImage='none'; preview.classList.remove('has-img'); }
 }
 
 function showTab(t) {
@@ -322,7 +329,7 @@ function showTab(t) {
   if(t==='bg') renderBgPreview();
 }
 
-/* ---- Background ---- */
+/* ---- Background (per-user) ---- */
 const COLOR_PRESETS = [
   {color:'#f5f5f5', label:'Putih'},
   {color:'#1a1a2e', label:'Malam'},
@@ -352,7 +359,10 @@ function setBgColor(color, idx) {
   document.querySelectorAll('.color-preset').forEach(e=>e.classList.remove('active'));
   const el=document.getElementById('preset-'+idx);
   if(el) el.classList.add('active');
-  try { localStorage.setItem(BG_KEY, JSON.stringify({type:'color', value:color, idx})); } catch(e){}
+  // Save under current user's key
+  if(currentUser) {
+    try { localStorage.setItem(bgKey(currentUser), JSON.stringify({type:'color', value:color, idx})); } catch(e){}
+  }
 }
 
 function handleBgUpload(event) {
@@ -362,8 +372,11 @@ function handleBgUpload(event) {
   reader.onload=function(e) {
     const dataUrl=e.target.result;
     applyBgImage(dataUrl);
-    try { localStorage.setItem(BG_KEY, JSON.stringify({type:'image', value:dataUrl})); } catch(err) {
-      alert('Gambar terlalu besar untuk disimpan. Cuba gambar yang lebih kecil.');
+    // Save under current user's key
+    if(currentUser) {
+      try { localStorage.setItem(bgKey(currentUser), JSON.stringify({type:'image', value:dataUrl})); } catch(err) {
+        alert('Gambar terlalu besar untuk disimpan. Cuba gambar yang lebih kecil.');
+      }
     }
   };
   reader.readAsDataURL(file);
@@ -380,9 +393,10 @@ function applyBgImage(dataUrl) {
 
 function renderBgPreview(dataUrl) {
   const preview=document.getElementById('bg-preview');
-  if(!dataUrl) {
+  if(!preview) return;
+  if(!dataUrl && currentUser) {
     try {
-      const saved=JSON.parse(localStorage.getItem(BG_KEY)||'{}');
+      const saved=JSON.parse(localStorage.getItem(bgKey(currentUser))||'{}');
       if(saved.type==='image') dataUrl=saved.value;
     } catch(e){}
   }
@@ -402,12 +416,18 @@ function removeBg() {
   document.getElementById('bg-preview').style.backgroundImage='none';
   document.getElementById('bg-preview').classList.remove('has-img');
   document.querySelectorAll('.color-preset').forEach(e=>e.classList.remove('active'));
-  try { localStorage.removeItem(BG_KEY); } catch(e){}
+  // Remove only this user's BG key
+  if(currentUser) {
+    try { localStorage.removeItem(bgKey(currentUser)); } catch(e){}
+  }
 }
 
-function loadBg() {
+function loadBg(u) {
+  // First reset to default, then load user-specific BG
+  applyDefaultBg();
+  if(!u) return;
   try {
-    const saved=JSON.parse(localStorage.getItem(BG_KEY)||'{}');
+    const saved=JSON.parse(localStorage.getItem(bgKey(u))||'{}');
     if(saved.type==='image') { applyBgImage(saved.value); }
     else if(saved.type==='color') { setBgColor(saved.value, saved.idx); }
   } catch(e){}
@@ -541,7 +561,7 @@ function buildBoard() {
 
 buildBoard();
 buildColorPresets();
-loadBg();
+// Don't load any BG on page load — wait until user logs in
 </script>
 </body>
 </html>
